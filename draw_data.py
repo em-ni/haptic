@@ -3,8 +3,9 @@ import matplotlib.pyplot as plt
 import src.config as config
 
 # Load CSV
-csv_path = "/home/emanuele/Desktop/github/haptic/data/exp_2025-09-24_11-34-57/output_exp_2025-09-24_11-34-57.csv"
+csv_path = "/home/emanuele/Desktop/github/haptic/data/exp_2025-09-24_15-25-56/output_exp_2025-09-24_15-25-56.csv"
 df = pd.read_csv(csv_path)
+plot_velocity = False
 
 # Extract positions and velocities
 x = df["px"].values
@@ -16,9 +17,10 @@ vy = df["vy"].values
 plt.figure(figsize=(8, 8))
 plt.scatter(x, y, s=30, c="blue", label="Position")
 
-# Plot velocity vectors
-scale = 0.01  # adjust this to control arrow length
-plt.quiver(x, y, vx, vy, angles="xy", scale_units="xy", scale=1/scale, color="red", width=0.001, label="Velocity")
+if plot_velocity:
+    # Plot velocity vectors
+    scale = 0.01  # adjust this to control arrow length
+    plt.quiver(x, y, vx, vy, angles="xy", scale_units="xy", scale=1/scale, color="red", width=0.001, label="Velocity")
 
 # Labels and grid
 plt.xlabel("X position")

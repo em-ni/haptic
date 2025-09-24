@@ -7,6 +7,9 @@ import numpy as np
 new_experiment = input("Is this a new experiment? (y/n): ").lower().strip() == 'y'
 debug = False
 
+# Conversion factor 130px = 30mm
+px_to_mm = 30 / 130  # mm per pixel
+
 # Set experiment name and save directory
 today = time.strftime("%Y-%m-%d")
 time_now = time.strftime("%H-%M-%S")

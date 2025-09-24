@@ -28,6 +28,14 @@ try:
     # Initialize controller with tracker instance
     controller_instance = controller.Controller(arduino_port="/dev/ttyUSB0", tracker=tracker_instance)
 
+    # Print initial coordinates of the green tip
+    if controller_instance.tracker is not None:
+        origin = controller_instance.tracker.get_position()
+        print("Initial tip position:", origin)
+        controller_instance.init_coordinates = origin
+    else:
+        print("No tracker provided, skipping initial position print.")
+
     # Sweep workspace in a separate thread
     # sweep_thread = threading.Thread(target=controller_instance.polygon_sweep, args=(50, 0.2, 255), daemon=False)
     sweep_thread = threading.Thread(target=controller_instance.concentric_polygons_sweep, args=([255, 250, 245, 240, 235, 230, 225, 220, 215, 210, 205, 200, 195, 185, 175],), daemon=False)

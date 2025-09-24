@@ -13,12 +13,14 @@ debug = config.debug
 class Controller:
     def __init__(self, arduino_port, tracker):
         self.arduino = serial.Serial(arduino_port, 9600)
+
         # Allow Arduino to initialize
         time.sleep(2)
 
         # Initialize tracker
         self.tracker = tracker
         self.save_data = False
+        self.init_coordinates = [0, 0]
 
         # Init csv to log positions and velocities if tracker is provided
         if self.tracker is not None:
@@ -158,8 +160,15 @@ class Controller:
                 self.send_arduino(command)
 
                 if self.save_data and self.tracker is not None:
+                    # Get abs positions and velocities
                     position = self.tracker.get_position()
                     velocity = self.tracker.get_velocity()
+
+                    # Convert wrt initial position and to mm
+                    origin = self.init_coordinates
+                    position = (position - origin) * config.px_to_mm  # convert to mm relative to initial position
+                    velocity = (velocity - origin) * config.px_to_mm  # convert to mm relative to initial position
+
                     pm_values = command.split(",")
                     vm_values = [0, 0, 0, 0]  # Placeholder for velocity measurements
                     self.save_data_row(position, velocity, pm_values, vm_values)
@@ -219,6 +228,14 @@ if __name__ == "__main__":
         controller.send_trajectory(final_trajectories, delay=0.1)
 
     else:
+        # Print initial coordinates of the green tip
+        if controller.tracker is not None:
+            origin = controller.tracker.get_position()
+            controller.init_coordinates = origin
+            print("Initial tip position:", origin)
+        else:
+            print("No tracker provided, skipping initial position print.")
+
         # Workspace sweep
         print("Starting workspace sweep...")
         controller.polygon_sweep(perimeter_step=50, delay=0.2, max_radius=255)

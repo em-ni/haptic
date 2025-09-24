@@ -88,7 +88,7 @@ def train_and_validate(model: nn.Module,
                        train_loader,
                        val_loader,
                        device,
-                       epochs: int = 100,
+                       epochs: int = 150,
                        save_path: str = "best_model.pth"):
     best_val_loss = math.inf
     history = {"train_loss": [], "val_loss": []}

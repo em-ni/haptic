@@ -168,7 +168,7 @@ class Controller:
                 time.sleep(delay)
 
         # Order of motor movements
-        m_ids = [1,3,2,4,3,1,4]
+        m_ids = [1,3,2,4,3,1,4,2]
 
         # Initial position
         init_p = [max_radius,max_radius,-max_radius,-max_radius]

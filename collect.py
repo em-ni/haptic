@@ -21,14 +21,16 @@ try:
     tracker_thread.start()
     
     # Give tracker time to initialize
-    time.sleep(2)
+    print("Initializing tracker, please wait...")
+    time.sleep(3)
+    print("Tracker initialized.")
 
     # Initialize controller with tracker instance
     controller_instance = controller.Controller(arduino_port="/dev/ttyUSB0", tracker=tracker_instance)
 
     # Sweep workspace in a separate thread
     # sweep_thread = threading.Thread(target=controller_instance.polygon_sweep, args=(50, 0.2, 255), daemon=False)
-    sweep_thread = threading.Thread(target=controller_instance.concentric_polygons_sweep, args=([255, 220, 185, 150],), daemon=False)
+    sweep_thread = threading.Thread(target=controller_instance.concentric_polygons_sweep, args=([255, 245, 235, 225, 215, 205, 195, 185, 175],), daemon=False)
     sweep_thread.start()
 
     # Keep main thread alive and wait for threads to complete

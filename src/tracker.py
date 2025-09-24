@@ -70,7 +70,7 @@ class Tracker:
         # Find contours in the mask.
         contours, _ = cv2.findContours(mask_green, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         if len(contours) == 0:
-            print("No green tip detected.")
+            print("WARNING: No green tip detected.")
             return None
 
         # Choose the largest contour.

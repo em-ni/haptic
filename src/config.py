@@ -5,7 +5,7 @@ import time
 import numpy as np
 
 new_experiment = input("Is this a new experiment? (y/n): ").lower().strip() == 'y'
-debug = True
+debug = False
 
 # Set experiment name and save directory
 today = time.strftime("%Y-%m-%d")

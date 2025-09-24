@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import src.config as config
 
 # Load CSV
-csv_path = "/home/emanuele/Desktop/github/haptic/data/exp_2025-09-24_10-22-41/output_exp_2025-09-24_10-22-41.csv"
+csv_path = "data/exp_2025-09-24_11-04-35/output_exp_2025-09-24_11-04-35.csv"
 df = pd.read_csv(csv_path)
 
 # Extract positions and velocities
@@ -28,4 +28,11 @@ plt.legend()
 plt.axis("equal")
 plt.grid(False)
 
+# Save figure in the same directory as CSV
+fig_path = csv_path.replace("output_", "trajectory_").replace(".csv", ".png")
+plt.savefig(fig_path)
+print(f"Figure saved to {fig_path}")
+
 plt.show()
+
+

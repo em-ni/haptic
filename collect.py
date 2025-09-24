@@ -30,7 +30,7 @@ try:
 
     # Sweep workspace in a separate thread
     # sweep_thread = threading.Thread(target=controller_instance.polygon_sweep, args=(50, 0.2, 255), daemon=False)
-    sweep_thread = threading.Thread(target=controller_instance.concentric_polygons_sweep, args=([255, 245, 235, 225, 215, 205, 195, 185, 175],), daemon=False)
+    sweep_thread = threading.Thread(target=controller_instance.concentric_polygons_sweep, args=([255, 250, 245, 240, 235, 230, 225, 220, 215, 210, 205, 200, 195, 185, 175],), daemon=False)
     sweep_thread.start()
 
     # Keep main thread alive and wait for threads to complete

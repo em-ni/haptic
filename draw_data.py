@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import src.config as config
 
 # Load CSV
-csv_path = "data/exp_2025-09-24_11-04-35/output_exp_2025-09-24_11-04-35.csv"
+csv_path = "/home/emanuele/Desktop/github/haptic/data/exp_2025-09-24_11-34-57/output_exp_2025-09-24_11-34-57.csv"
 df = pd.read_csv(csv_path)
 
 # Extract positions and velocities

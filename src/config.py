@@ -18,27 +18,28 @@ save_dir = os.path.abspath(os.path.join(".", "data", experiment_name))
 csv_path = os.path.abspath(os.path.join(save_dir, f"output_{experiment_name}.csv"))
 data_dir = os.path.abspath(os.path.join(".", "data"))
 
+# Set the csv file columns
+csv_columns = [
+    "timestamp",
+    "px",
+    "py",
+    "vx",
+    "vy",
+    "pm1",
+    "pm2",
+    "pm3",
+    "pm4",
+    "vm1",
+    "vm2",
+    "vm3",
+    "vm4",
+]
+
 if new_experiment:
     # If they dont exist, create the directories and the csv file
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
 
-    # Set the csv file columns
-    csv_columns = [
-        "timestamp",
-        "px",
-        "py",
-        "vx",
-        "vy",
-        "pm1",
-        "pm2",
-        "pm3",
-        "pm4",
-        "vm1",
-        "vm2",
-        "vm3",
-        "vm4",
-    ]
     with open(csv_path, mode="w", newline="") as csvfile:
         writer = csv.writer(csvfile)
         writer.writerow(csv_columns)

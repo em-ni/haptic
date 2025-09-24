@@ -4,8 +4,10 @@ import cv2
 import numpy as np
 import platform
 from matplotlib.animation import FuncAnimation
-# import src.config as config
-import config as config
+try:
+    import config
+except ImportError:
+    import src.config as config
 
 # Threaded camera stream for fast frame grabbing
 class CameraStream:
@@ -52,6 +54,8 @@ class Tracker:
         self.cur_vel = None
         self.prev_vel = None
 
+        self.quit = False
+
     def detect_tip(self, frame):
         """
         Input: frame - Image from the camera
@@ -87,6 +91,12 @@ class Tracker:
         else:
             return alpha * new_value + (1 - alpha) * pre_filtered
         
+    def get_position(self):
+        return self.cur_pos
+
+    def get_velocity(self):
+        return self.cur_vel
+
     def track(self):
         """
         Main function to track the tip position and velocity.
@@ -101,7 +111,7 @@ class Tracker:
         
         start_time = time.time()
         frame_count = 0
-        while True:
+        while not self.quit:
             ret, frame = cam.read()
             if not ret:
                 print("Error: Could not read frame.")
@@ -142,7 +152,6 @@ class Tracker:
         cam.release()
         cv2.destroyAllWindows()
         elapsed_time = time.time() - start_time
-        print(f"Average FPS: {frame_count / elapsed_time:.2f}")
 
     def draw(self):
         """

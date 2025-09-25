@@ -17,12 +17,15 @@ class MPCConfig:
     SCALERS_PATH = os.path.join(BASE_DIR, "..", "data", EXP_FOLDER, "scalers.pkl")
     
     N = 3  # MPC horizon
-    DT = 0.3  # time step
+    DT = 0.1  # time step
     SIM_TIME = 15.0
     
     # Cost weights
     Q_pos = 10000.0  # position tracking weight
     R_control = 0.1  # control effort weight
+    R_rate = 1.0  # control rate weight
+    LAMBDA = 100.0  # terminal cost weight
+
     
     # Control bounds (PWM values)
     U_MIN = np.array([-255, -255, -255, -255])
@@ -40,6 +43,7 @@ class MPCController:
         # Initialize history
         self.history_y = []
         self.history_u = []
+        self.u_previous = np.zeros(self.n_controls)  # Store previous control for rate penalty
         
         print(f"Initialized MPCController")
         print(f"  Outputs: {self.n_outputs}, Controls: {self.n_controls}")
@@ -87,6 +91,7 @@ class MPCController:
         self.y_ref = self.opti.parameter(self.n_outputs, 1)  # Reference output
         self.lambda_param = self.opti.parameter(1, 1)  # Terminal cost weight
         self.P_terminal = self.opti.parameter(self.n_outputs, self.n_outputs)  # Terminal cost matrix
+        self.u_prev = self.opti.parameter(self.n_controls, 1)  # Previous control input
         
         # Linear approximation parameters
         self.A_lin = self.opti.parameter(self.n_outputs, self.n_controls)
@@ -104,6 +109,12 @@ class MPCController:
             
             # Control effort cost
             cost += MPCConfig.R_control * ca.sumsqr(u_k)
+            
+            # Control rate cost
+            if k == 0:
+                cost += MPCConfig.R_rate * ca.sumsqr(u_k - self.u_prev)
+            else:
+                cost += MPCConfig.R_rate * ca.sumsqr(u_k - self.U[:, k-1])
         
         # Terminal cost - use final predicted output
         y_terminal = self.A_lin @ self.U[:, -1] + self.b_lin
@@ -180,8 +191,8 @@ class MPCController:
     def step(self, y_ref, y_current=None):
         """Solve MPC and return optimal control input"""
         # Use previous control as nominal point for linearization
-        if hasattr(self, 'u_prev'):
-            u_nom = self.u_prev.copy()
+        if hasattr(self, 'u_previous'):
+            u_nom = self.u_previous.copy()
         else:
             u_nom = np.zeros(self.n_controls)
         
@@ -197,7 +208,7 @@ class MPCController:
         
         # Compute terminal cost matrix
         P_terminal = self.compute_terminal_cost_matrix(A_lin)
-        lambda_weight = 50.0  # Terminal cost scaling factor
+        lambda_weight = MPCConfig.LAMBDA
         
         # Set parameters
         self.opti.set_value(self.y_ref, y_ref.reshape(-1, 1))
@@ -205,11 +216,12 @@ class MPCController:
         self.opti.set_value(self.b_lin, b_lin.reshape(-1, 1))
         self.opti.set_value(self.P_terminal, P_terminal)
         self.opti.set_value(self.lambda_param, np.array([[lambda_weight]]))
+        self.opti.set_value(self.u_prev, self.u_previous.reshape(-1, 1))
         
         try:
             sol = self.opti.solve()
             u_optimal = sol.value(self.U[:, 0])  # Take first control action
-            self.u_prev = u_optimal.copy()  # Store for next iteration
+            self.u_previous = u_optimal.copy()  # Store for next iteration rate penalty
             return u_optimal
         except Exception as e:
             print(f"MPC solver failed: {e}")

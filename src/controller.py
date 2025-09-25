@@ -21,6 +21,7 @@ class Controller:
         self.tracker = tracker
         self.save_data = False
         self.init_coordinates = [0, 0]
+        self.control_window = []
 
         # Init csv to log positions and velocities if tracker is provided
         if self.tracker is not None:
@@ -44,6 +45,25 @@ class Controller:
             time.sleep(2)
             if debug: print(f"Finished sweep for radius: {radius}")
         if debug: print("\nFinished all polygons.")
+
+    def filter_control_signals(self, signals):
+        """
+        Apply a simple moving average filter to the control signals to smooth them.
+        """
+        # String to list of integers
+        signals = list(map(int, signals.split(",")))
+        filtered = signals
+
+        window_size = 5
+        if len(self.control_window) < window_size:
+            self.control_window.append(signals)
+        else:
+            self.control_window.pop(0)
+            self.control_window.append(signals)
+            filtered = np.mean(self.control_window, axis=0).astype(int)
+            
+        # Return as comma-separated string
+        return ",".join(map(str, filtered))
 
     def generate_random_trajectory(self, N):
         """
@@ -125,8 +145,9 @@ class Controller:
             writer.writerow(row)
 
     def send_arduino(self, command):
+        filtered_command = self.filter_control_signals(command)
         if self.arduino.is_open:
-            self.arduino.write(command.encode())
+            self.arduino.write(filtered_command.encode())
         else:
             print("Error: Arduino port is not open.")
         time.sleep(0.1)

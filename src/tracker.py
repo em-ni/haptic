@@ -46,7 +46,7 @@ class Tracker:
         self.cam_index = cam_index
 
         # Smoothing factor for the exponential moving average filter (lower is smoother)
-        self.alpha = 0.3
+        self.alpha = 0.2
 
         # Tracking variables
         self.cur_pos = None
@@ -225,7 +225,7 @@ class Tracker:
         cam.release()
 
 if __name__ == "__main__":
-    cam_index = 2  # Change this based on your camera index
+    cam_index = 0  # Change this based on your camera index
     tracker = Tracker(cam_index)
     tracker.track()
     tracker.draw()

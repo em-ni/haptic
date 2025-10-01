@@ -21,15 +21,19 @@ class MPCConfig:
     SIM_TIME = 15.0
     
     # Cost weights
-    Q_pos = 10000.0  # position tracking weight
+    Q_pos = 1000.0  # position tracking weight
     R_control = 0.1  # control effort weight
-    R_rate = 1.0  # control rate weight
-    LAMBDA = 100.0  # terminal cost weight
+    R_rate = 10.0  # control rate weight
+    LAMBDA = 200.0  # terminal cost weight
+    DZ_COST = 2000.0  # dead zone penalty weight
+    SIGMA = 60.0  # dead zone penalty sharpness
 
     
     # Control bounds (PWM values)
     U_MIN = np.array([-255, -255, -255, -255])
     U_MAX = np.array([255, 255, 255, 255])
+    U_DEADZONE_MIN = np.array([-150, -150, -150, -150])
+    U_DEADZONE_MAX = np.array([150, 150, 150, 150])
 
 class MPCController:
     def __init__(self):
@@ -43,7 +47,8 @@ class MPCController:
         # Initialize history
         self.history_y = []
         self.history_u = []
-        self.u_previous = np.zeros(self.n_controls)  # Store previous control for rate penalty
+        # self.u_previous = np.zeros(self.n_controls)  # Store previous control for rate penalty
+        self.u_previous = np.array([150, 150, -150, -150])  # Start from a nominal point away from deadzone
         
         print(f"Initialized MPCController")
         print(f"  Outputs: {self.n_outputs}, Controls: {self.n_controls}")
@@ -115,6 +120,13 @@ class MPCController:
                 cost += MPCConfig.R_rate * ca.sumsqr(u_k - self.u_prev)
             else:
                 cost += MPCConfig.R_rate * ca.sumsqr(u_k - self.U[:, k-1])
+
+            # Dead zone cost
+            cost += MPCConfig.DZ_COST * ca.exp(-(u_k[0]**2)/MPCConfig.SIGMA)
+            cost += MPCConfig.DZ_COST * ca.exp(-(u_k[1]**2)/MPCConfig.SIGMA)
+            cost += MPCConfig.DZ_COST * ca.exp(-(u_k[2]**2)/MPCConfig.SIGMA)
+            cost += MPCConfig.DZ_COST * ca.exp(-(u_k[3]**2)/MPCConfig.SIGMA)
+
         
         # Terminal cost - use final predicted output
         y_terminal = self.A_lin @ self.U[:, -1] + self.b_lin
@@ -126,7 +138,7 @@ class MPCController:
         # Control constraints
         for k in range(MPCConfig.N):
             self.opti.subject_to(self.opti.bounded(MPCConfig.U_MIN, self.U[:, k], MPCConfig.U_MAX))
-        
+
         # Solver settings
         opts = {'ipopt.print_level': 0, 'print_time': 0, 'ipopt.sb': 'yes'}
         self.opti.solver('ipopt', opts)

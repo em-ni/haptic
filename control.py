@@ -62,7 +62,7 @@ try:
     if LINE:
         # Define target trajectory (simple line reference)
         line_start = np.array([0.0, 0.0])
-        line_end = np.array([-0.9, -1.0])
+        line_end = np.array([-1.5, -2.0])
         target_trajectory = line_trajectory(line_start, line_end, N=10)
         print(f"Target trajectory (line): {target_trajectory} mm")
 
@@ -104,7 +104,7 @@ try:
                 
                 print(f"Step {i+1}/{max_iterations}: Sending PWM: {pwm_values}")
                 controller_instance.send_arduino(command)
-                time.sleep(0.1)
+                time.sleep(2)
                 
                 # Logging current position
                 if controller_instance.tracker is not None:

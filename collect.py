@@ -16,7 +16,7 @@ signal.signal(signal.SIGINT, signal_handler)
 
 try:
     # Start tracker in a separate thread
-    tracker_instance = tracker.Tracker(cam_index=2)
+    tracker_instance = tracker.Tracker(cam_index=0)
     tracker_thread = threading.Thread(target=tracker_instance.track, daemon=False)
     tracker_thread.start()
     
@@ -38,9 +38,11 @@ try:
 
     # Sweep workspace in a separate thread
     # sweep_thread = threading.Thread(target=controller_instance.polygon_sweep, args=(50, 0.2, 255), daemon=False)
-    sweep_thread = threading.Thread(target=controller_instance.concentric_polygons_sweep, args=([255, 250, 245, 240, 235, 230, 225, 220, 215, 210, 205, 200, 195, 185, 175],), daemon=False)
+    # sweep_thread = threading.Thread(target=controller_instance.concentric_polygons_sweep, args=([255, 235, 215, 175],), daemon=False)
+    # sweep_thread = threading.Thread(target=controller_instance.concentric_polygons_sweep, args=([255],), daemon=False)
+    sweep_thread = threading.Thread(target=controller_instance.run_many_random_trajectories, args=(100, 10, 1), daemon=False)
     sweep_thread.start()
-
+    
     # Keep main thread alive and wait for threads to complete
     print("System running. Press Ctrl+C to stop.")
     

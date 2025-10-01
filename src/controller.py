@@ -65,36 +65,50 @@ class Controller:
         # Return as comma-separated string
         return ",".join(map(str, filtered))
 
-    def generate_random_trajectory(self, N):
+    def generate_random_trajectory(self, N, skip_deadzone=False, end_to_end=True):
         """
         Generate random trajectories for four motors, each in [-255,-150] U [150,255] skipping the dead zone [-149,149]. 
         Ensures that at each point, the four motors do not have the same sign.
         """
-        valid_ranges = [(-255, -150), (150, 255)]
+        if skip_deadzone:
+            valid_ranges = [(-255, -150), (150, 255)]
+        else:
+            valid_ranges = [(-255, 255)]
         
         while True:  # keep trying until we get valid trajectories
             trajectories = []
             for motor_idx in range(4):
-                start_range = random.choice(valid_ranges)
-                end_range = random.choice(valid_ranges)
-                start = random.randint(start_range[0], start_range[1])
-                end = random.randint(end_range[0], end_range[1])
-                traj = self.interpolate_skip_deadzone(start, end, N)
+                if skip_deadzone:
+                    start_range = random.choice(valid_ranges)
+                    end_range = random.choice(valid_ranges)
+                    start = random.randint(start_range[0], start_range[1])
+                    end = random.randint(end_range[0], end_range[1])
+                    traj = self.interpolate_skip_deadzone(start, end, N)
+                else:
+                    if end_to_end:
+                        # Pick one between -255 and 255, not a random integer withing the range
+                        start = random.choice([-255, 255, 0])
+                        end = random.choice([-255, 255, 0])
+                    else:
+                        start = random.randint(-255, 255)
+                        end = random.randint(-255, 255)
+                    traj = np.linspace(start, end, N, dtype=int).tolist()
                 trajectories.append(traj)
-
+            
             # Check sign constraint at every point
             valid = True
-            for i in range(N):
-                values = [trajectories[m][i] for m in range(4)]
-                signs = [v > 0 for v in values]
-                if all(signs) or not any(signs):
-                    valid = False
-                    break
+            # for i in range(N):
+            #     values = [trajectories[m][i] for m in range(4)]
+            #     signs = [v > 0 for v in values]
+            #     if all(signs) or not any(signs):
+            #         valid = False
+            #         # If not valid, try again
+            #         print("Generated trajectories are not valid. Retrying...")
+            #         break
 
             if valid:
                 return trajectories
-            # If not valid, try again
-            print("Generated trajectories are not valid. Retrying...")
+
 
     def interpolate_skip_deadzone(self, start, end, N):
         """
@@ -144,20 +158,38 @@ class Controller:
             writer = csv.writer(csvfile)
             writer.writerow(row)
 
-    def send_arduino(self, command):
-        filtered_command = self.filter_control_signals(command)
-        if self.arduino.is_open:
-            self.arduino.write(filtered_command.encode())
-        else:
-            print("Error: Arduino port is not open.")
-        time.sleep(0.1)
+    def send_arduino(self, command, bomb=10):
+        for _ in range(bomb):
+            # filtered_command = self.filter_control_signals(command)
+            filtered_command = command
+            if self.arduino.is_open:
+                self.arduino.write(filtered_command.encode())
+            else:
+                print("Error: Arduino port is not open.")
+            time.sleep(0.001)
 
     def send_trajectory(self, trajectories, delay):
         N = len(trajectories[0])
         for i in range(N):
             command = ",".join(str(trajectories[m][i]) for m in range(4))
             # print(f"Sending command: {command}")
-            self.send_arduino(command)
+            self.send_arduino(command, bomb=10)
+            time.sleep(5)
+
+            if self.save_data and self.tracker is not None:
+                # Get abs positions and velocities
+                position = self.tracker.get_position()
+                velocity = self.tracker.get_velocity()
+
+                # Convert wrt initial position and to mm
+                origin = self.init_coordinates
+                position = (position - origin) * config.px_to_mm  # convert to mm relative to initial position
+                velocity = (velocity - origin) * config.px_to_mm  # convert to mm relative to initial position
+
+                pm_values = command.split(",")
+                vm_values = [0, 0, 0, 0]  # Placeholder for velocity measurements
+                self.save_data_row(position, velocity, pm_values, vm_values)
+                if debug: print(f"Logged data: Pos {position}, Vel {velocity}, PM {pm_values}, VM {vm_values}")
             time.sleep(delay)
 
     def polygon_sweep(self, perimeter_step, delay, max_radius):
@@ -173,7 +205,7 @@ class Controller:
             # positive to negative
             else:  
                 positions = list(range(max_radius, 149, -perimeter_step)) + list(range(-150, -max_radius + 1, -perimeter_step))
-
+            if debug: print(f"Sweeping motor {m_id} in direction {direction} with positions: {positions}")
             for pos in positions:
                 cur_positions[m_id-1] = pos
                 command = ",".join(str(p) for p in cur_positions)
@@ -216,6 +248,25 @@ class Controller:
             direction = "np" if curr_p[m_id-1] < 0 else "pn"
             sweep_motor(m_id, curr_p, perimeter_step, direction, max_radius)
             time.sleep(2)
+
+    def run_many_random_trajectories(self, num_trajectories, N, delay):
+        for traj_idx in range(num_trajectories):
+            start_time = time.time()
+            print(f"\nStarting random trajectory {traj_idx+1}/{num_trajectories}...")
+            trajectories = self.generate_random_trajectory(N, skip_deadzone=False)
+
+            for idx, traj in enumerate(trajectories):
+                print(f"Motor {idx+1} trajectory: {traj}")
+
+            print("Sending trajectories to Arduino...")
+            self.send_trajectory(trajectories, delay=delay)
+
+            print("Trajectory completed. Waiting for 1 second before next...")
+            time.sleep(1)
+            end_time = time.time()
+            print(f"Trajectory {traj_idx+1} took {end_time - start_time:.2f} seconds, included waiting time.")
+
+        print("\nAll random trajectories completed.")
 
 
 

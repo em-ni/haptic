@@ -29,9 +29,9 @@ class MLP(nn.Module):
         self.network = nn.Sequential(
             nn.Linear(in_dim, 128),
             nn.ReLU(),
-            nn.Linear(128, 128),
+            nn.Linear(128, 256),
             nn.ReLU(),
-            nn.Linear(128, 128),
+            nn.Linear(256, 128),
             nn.ReLU(),
             nn.Linear(128, out_dim)
         )

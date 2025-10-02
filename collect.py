@@ -40,7 +40,7 @@ try:
     # sweep_thread = threading.Thread(target=controller_instance.polygon_sweep, args=(50, 0.2, 255), daemon=False)
     # sweep_thread = threading.Thread(target=controller_instance.concentric_polygons_sweep, args=([255, 235, 215, 175],), daemon=False)
     # sweep_thread = threading.Thread(target=controller_instance.concentric_polygons_sweep, args=([255],), daemon=False)
-    sweep_thread = threading.Thread(target=controller_instance.run_many_random_trajectories, args=(100, 10, 1), daemon=False)
+    sweep_thread = threading.Thread(target=controller_instance.run_many_random_trajectories, args=(1500, 10, 1), daemon=False)
     sweep_thread.start()
     
     # Keep main thread alive and wait for threads to complete

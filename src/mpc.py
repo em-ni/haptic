@@ -12,7 +12,7 @@ except ImportError:
 
 class MPCConfig:
     BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-    EXP_FOLDER = "exp_2025-09-24_15-25-56"
+    EXP_FOLDER = "exp_2025-10-01_18-35-12"
     MODEL_PATH = os.path.join(BASE_DIR, "..", "data", EXP_FOLDER, "best_model.pth")
     SCALERS_PATH = os.path.join(BASE_DIR, "..", "data", EXP_FOLDER, "scalers.pkl")
     
@@ -27,7 +27,6 @@ class MPCConfig:
     LAMBDA = 200.0  # terminal cost weight
     DZ_COST = 2000.0  # dead zone penalty weight
     SIGMA = 60.0  # dead zone penalty sharpness
-
     
     # Control bounds (PWM values)
     U_MIN = np.array([-255, -255, -255, -255])

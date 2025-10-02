@@ -3,15 +3,22 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.spatial import cKDTree
 
-# === Load your dataset ===
 # Expecting CSV with columns: pm1..pm4, vm1..vm4, px, py
-data = pd.read_csv("/home/emanuele/Desktop/github/haptic/data/exp_2025-10-01_11-59-24/output_exp_2025-10-01_11-59-24.csv")
+csv_path = "/home/emanuele/Desktop/github/haptic/data/exp_2025-10-01_18-35-12/output_exp_2025-10-01_18-35-12.csv"
+data = pd.read_csv(csv_path)
 
 X = data[["pm1", "pm2", "pm3", "pm4"]].values
 y = data[["px", "py"]].values
 
-# === Step 1: Estimate irreducible error via local variance ===
+# Estimate irreducible error via local variance
 def local_variance(X, y, k=5):
+    # Ensure k doesn't exceed the number of available data points
+    k = min(k, len(X))
+    
+    # If we have fewer than 2 points, we can't compute meaningful variance
+    if len(X) < 2:
+        return np.array([np.nan, np.nan]), np.array([np.nan, np.nan]), np.array([])
+    
     tree = cKDTree(X)
     vars_ = []
     means_ = []
@@ -23,49 +30,74 @@ def local_variance(X, y, k=5):
     return np.mean(vars_, axis=0), np.max(vars_, axis=0), np.array(means_)
 
 mean_var, max_var, neigh_means = local_variance(X, y, k=10)
-print("=== Local Variance Estimates (Noise Floor) ===")
 print(f"Mean variance per output: {mean_var}")
 print(f"Max variance per output:  {max_var}")
 
-# === Step 2: Visualize noise in output space ===
-plt.figure(figsize=(8,8))
-plt.scatter(y[:,0], y[:,1], alpha=0.3, s=10, label="Recorded points")
-plt.scatter(neigh_means[:,0], neigh_means[:,1], alpha=0.3, s=10, label="Local means")
-plt.xlabel("px")
-plt.ylabel("py")
-plt.title("Tip position with local neighborhood means")
-plt.legend()
-plt.axis("equal")
-plt.tight_layout()
-plt.savefig("tip_positions_with_noise.png")
+# Compute distance from the origin
+data["dist_from_origin"] = np.sqrt(data["px"]**2 + data["py"]**2)
+dist_min, dist_max = np.min(data["dist_from_origin"]), np.max(data["dist_from_origin"])
 
-# === Step 3: Precision visualization (local neighborhoods) ===
-# Plot spread of neighbors around some random samples
-np.random.seed(42)
-sample_idxs = np.random.choice(len(X), size=5, replace=False)
+# Compute bins
+n_bins = 50
+bins = np.linspace(dist_min, dist_max, n_bins + 1)
+data["dist_bin"] = np.digitize(data["dist_from_origin"], bins) - 1
 
-fig, axs = plt.subplots(1,5, figsize=(20,4))
-for ax, idx in zip(axs, sample_idxs):
-    dists, neigh_idxs = cKDTree(X).query(X[idx], k=20)
-    neigh_y = y[neigh_idxs]
-    ax.scatter(neigh_y[:,0], neigh_y[:,1], alpha=0.6, s=15)
-    ax.scatter(y[idx,0], y[idx,1], color="red", marker="x", s=50)
-    ax.set_title(f"Sample {idx}")
-    ax.axis("equal")
-plt.tight_layout()
-plt.savefig("neighborhood_spread.png")
+# For each point compute distance from origin and assign to bin
+bin_stats = []
+for b in range(n_bins):
+    subset = data[data["dist_bin"] == b]
+    if len(subset) >= 2:  # Need at least 2 points for meaningful variance calculation
+        bin_mean_var, bin_max_var, _ = local_variance(subset[["pm1", "pm2", "pm3", "pm4"]].values,
+                                                      subset[["px", "py"]].values, k=10)
+        bin_stats.append((b, len(subset), bin_mean_var, bin_max_var))
+    else:
+        bin_stats.append((b, len(subset), (np.nan, np.nan), (np.nan, np.nan)))
 
-# === Step 4: Frequency plots of px and py ===
-fig, axs = plt.subplots(1,2, figsize=(12,5))
-axs[0].hist(y[:,0], bins=50, alpha=0.7)
-axs[0].set_title("Frequency of px")
-axs[0].set_xlabel("px")
-axs[0].set_ylabel("Count")
+bin_stats = np.array(bin_stats, dtype=object)   
 
-axs[1].hist(y[:,1], bins=50, alpha=0.7)
-axs[1].set_title("Frequency of py")
-axs[1].set_xlabel("py")
-axs[1].set_ylabel("Count")
+# Count points per bin
+counts = bin_stats[:, 1].astype(int)
 
-plt.tight_layout()
-plt.savefig("frequency_px_py.png")
+# Plot bins (x axis) vs number of points in bin (y axis)
+plt.figure(figsize=(10, 5))
+plt.bar(range(n_bins), counts)
+plt.xlabel("Distance Bin")
+plt.ylabel("Number of Points")
+plt.title("Number of Points per Distance Bin")
+plt.grid()
+plt.show()
+
+# Set max number of points to consider per bin
+max_points_per_bin = 200
+min_points_per_bin = 60
+
+# For each bin if it has more than max_points_per_bin points, randomly sample max_points_per_bin points
+# If it has less than min_points_per_bin points, discard the bin
+for b in range(n_bins):
+    if bin_stats[b][1] > max_points_per_bin:
+        subset = data[data["dist_bin"] == b]
+        sampled_subset = subset.sample(n=max_points_per_bin, random_state=42)
+        data = data[data["dist_bin"] != b]
+        data = pd.concat([data, sampled_subset], axis=0)
+    elif bin_stats[b][1] < min_points_per_bin:
+        data = data[data["dist_bin"] != b]
+
+# Plot bins vs number of points in bin after sampling
+counts = []
+for b in range(n_bins):
+    subset = data[data["dist_bin"] == b]
+    counts.append(len(subset))
+counts = np.array(counts)
+plt.figure(figsize=(10, 5))
+plt.bar(range(n_bins), counts)
+plt.xlabel("Distance Bin")
+plt.ylabel("Number of Points (after sampling)")
+plt.title("Number of Points per Distance Bin (after sampling)")
+plt.grid()
+plt.show()
+
+# Save the new dataset
+data = data.sample(frac=1, random_state=42).reset_index(drop=True)
+out_path = csv_path.replace("output_", "sampled_").replace(".csv", ".csv")
+data.to_csv(out_path, index=False)
+print(f"Sampled dataset saved to {out_path}")

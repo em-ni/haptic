@@ -159,10 +159,10 @@ try:
         for i in range(n):
             print(f"  Repetition {i+1}/{n}")
             temp_point = get_random_point()
-            controller_instance.send_arduino(temp_point, bomb=10)
+            controller_instance.send_arduino(temp_point, bomb=1)
             time.sleep(3)
             start = time.time()
-            controller_instance.send_arduino(point, bomb=10)
+            controller_instance.send_arduino(point, bomb=1)
             end = time.time()
             # print(f"  Command sent in {end - start:.2f} seconds")
             time.sleep(3)  # Wait for the system to stabilize

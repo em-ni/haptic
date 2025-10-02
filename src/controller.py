@@ -158,7 +158,7 @@ class Controller:
             writer = csv.writer(csvfile)
             writer.writerow(row)
 
-    def send_arduino(self, command, bomb=10):
+    def send_arduino(self, command, bomb=1):
         for _ in range(bomb):
             # filtered_command = self.filter_control_signals(command)
             filtered_command = command
@@ -166,14 +166,14 @@ class Controller:
                 self.arduino.write(filtered_command.encode())
             else:
                 print("Error: Arduino port is not open.")
-            time.sleep(0.001)
+            time.sleep(0.1)
 
     def send_trajectory(self, trajectories, delay):
         N = len(trajectories[0])
         for i in range(N):
             command = ",".join(str(trajectories[m][i]) for m in range(4))
             # print(f"Sending command: {command}")
-            self.send_arduino(command, bomb=10)
+            self.send_arduino(command, bomb=1)
             time.sleep(5)
 
             if self.save_data and self.tracker is not None:

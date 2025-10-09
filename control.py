@@ -16,7 +16,13 @@ def line_trajectory(start, end, N):
     x_values = np.linspace(start[0], end[0], N)
     y_values = np.linspace(start[1], end[1], N)
     return np.vstack((x_values, y_values)).T
-    
+
+def circle_trajectory(center, radius, N):
+    # Return a circular trajectory around center with given radius and N points
+    angles = np.linspace(0, 2 * np.pi, N, endpoint=False)
+    x_values = center[0] + radius * np.cos(angles)
+    y_values = center[1] + radius * np.sin(angles)
+    return np.vstack((x_values, y_values)).T
 
 def signal_handler(sig, frame):
     print('\nShutting down gracefully...')
@@ -29,7 +35,7 @@ signal.signal(signal.SIGINT, signal_handler)
 
 try:
     # Start tracker in a separate thread
-    tracker_instance = tracker.Tracker(cam_index=2)
+    tracker_instance = tracker.Tracker(cam_index=0)
     tracker_thread = threading.Thread(target=tracker_instance.track, daemon=False)
     tracker_thread.start()
     
@@ -53,32 +59,55 @@ try:
         controller_instance.init_coordinates = origin
     else:
         print("No tracker provided, skipping initial position print.")
-
+    
+    # Initialize target position variable
+    target_position = np.array([0.0, 0.0])  # Default target position
+    
     if STEP:
         # Define target trajectory (simple step reference)
-        target_position = np.array([-0.9, -1.5])  # Target px, py in mm
+        target_position = np.array([0.9, 0.5])  # Target px, py in mm
         print(f"Target position: {target_position} mm")
 
     if LINE:
         # Define target trajectory (simple line reference)
-        line_start = np.array([0.0, 0.0])
-        line_end = np.array([-1.5, -2.0])
-        target_trajectory = line_trajectory(line_start, line_end, N=10)
+        line_start = np.array([0.7, -0.7])
+        line_end = np.array([-0.7, 0.7])
+        target_trajectory = line_trajectory(line_start, line_end, N=100)
         print(f"Target trajectory (line): {target_trajectory} mm")
+        # Initialize target_position with first point of trajectory
+        target_position = target_trajectory[0]
 
-    # if CIRCLE:
+    if CIRCLE:
+        # Define target trajectory (circle reference, 2mm diameter = 1mm radius)
+        circle_center = np.array([0.0, 0.0])  # Center at origin
+        circle_radius = 0.9  # mm
+        target_trajectory = circle_trajectory(circle_center, circle_radius, N=40)
+        print(f"Target trajectory (circle): {target_trajectory} mm")
+
+        # Line from center to first point of circle
+        line_start = np.array([0.0, 0.0])
+        line_end = target_trajectory[0]
+        approach_trajectory = line_trajectory(line_start, line_end, N=10)
+
+        # Prepend approach trajectory to circle trajectory
+        target_trajectory = np.vstack((approach_trajectory, target_trajectory))
+        # Initialize target_position with first point of trajectory
+        target_position = target_trajectory[0]
 
     # MPC control loop
-    def mpc_control_loop():
+    def mpc_control_loop(initial_target_position, target_trajectory_param=None):
         """Run MPC control loop"""
         print("Starting MPC control loop...")
+        
+        # Initialize target position for this function
+        current_target_position = initial_target_position.copy()
         
         dt = MPCConfig.DT
         T = MPCConfig.SIM_TIME
         control_rate = int(1.0 / dt)
         max_iterations = int(T * control_rate)
 
-        line_step = max_iterations // len(target_trajectory) if LINE else 1
+        line_step = max_iterations // len(target_trajectory_param) if LINE and target_trajectory_param is not None else 1
         
         for i in range(max_iterations):
             try:
@@ -90,28 +119,29 @@ try:
                     current_pos_mm = np.array([0.0, 0.0])
 
                 # Determine target position
-                if LINE:
-                    if i % line_step == 0 and (i // line_step) < len(target_trajectory):
-                        target_position = target_trajectory[i // line_step]
-                    target_position = target_position
-                
+                if LINE and target_trajectory_param is not None:
+                    trajectory_index = min(i // line_step, len(target_trajectory_param) - 1)
+                    current_target_position = target_trajectory_param[trajectory_index]
+
+                elif CIRCLE:
+                    current_target_position = target_trajectory[i % len(target_trajectory)]
+
                 # Get optimal control from MPC with current position feedback
-                u_optimal = mpc_controller.step(target_position, current_pos_mm)
+                u_optimal = mpc_controller.step(current_target_position, current_pos_mm)
                 
                 # Convert to integer PWM values and send to Arduino
                 pwm_values = [int(round(u)) for u in u_optimal]
                 command = ",".join(str(pwm) for pwm in pwm_values)
                 
-                print(f"Step {i+1}/{max_iterations}: Sending PWM: {pwm_values}")
                 controller_instance.send_arduino(command)
-                time.sleep(2)
+                time.sleep(3)
                 
                 # Logging current position
                 if controller_instance.tracker is not None:
-                    error = np.linalg.norm(current_pos_mm - target_position)
-                    
+                    error = np.linalg.norm(current_pos_mm - current_target_position)
+
                     if i % 5 == 0:  # Print every 5 steps
-                        print(f"  Current pos: [{current_pos_mm[0]:.2f}, {current_pos_mm[1]:.2f}] mm, Error: {error:.3f} mm")
+                        print(f"Step {i+1}/{max_iterations}: Sending PWM: {pwm_values} Current pos: [{current_pos_mm[0]:.2f}, {current_pos_mm[1]:.2f}] mm, Error: {error:.3f} mm")
                 
                 # Store data for MPC history (use consistent scaling)
                 if controller_instance.tracker is not None:
@@ -135,7 +165,8 @@ try:
         print("MPC control loop completed.")
 
     # Run MPC control in a separate thread
-    mpc_thread = threading.Thread(target=mpc_control_loop, daemon=False)
+    trajectory_param = target_trajectory if LINE else None
+    mpc_thread = threading.Thread(target=mpc_control_loop, args=(target_position, trajectory_param), daemon=False)
     mpc_thread.start()
 
     # Keep main thread alive and wait for threads to complete
@@ -153,28 +184,27 @@ try:
     mpc_controller.plot_results()
 
     # Plot 2D trajectory and target trajectory
-    # Plot 2D trajectory
     import matplotlib.pyplot as plt
-    
+
     if mpc_controller.history_y:
         # Extract x and y coordinates from history
         actual_trajectory = np.array(mpc_controller.history_y)
-        
+
         plt.figure(figsize=(10, 6))
-        
-        # Plot actual trajectory
-        plt.plot(actual_trajectory[:, 0], actual_trajectory[:, 1], 'b-', label='Actual Trajectory', linewidth=2)
-        
-        # Plot target trajectory if LINE mode
-        if LINE:
-            plt.plot(target_trajectory[:, 0], target_trajectory[:, 1], 'r--', label='Target Trajectory', linewidth=2, marker='o')
+
+        # Plot actual trajectory points
+        plt.scatter(actual_trajectory[:, 0], actual_trajectory[:, 1], c='b', label='Actual Trajectory', s=30)
+
+        # Plot target trajectory points
+        if LINE or CIRCLE:
+            plt.scatter(target_trajectory[:, 0], target_trajectory[:, 1], c='r', label='Target Trajectory', s=30, marker='o')
         elif STEP:
-            plt.plot(target_position[0], target_position[1], 'ro', markersize=10, label='Target Position')
-        
+            plt.scatter(target_position[0], target_position[1], c='r', s=80, marker='o', label='Target Position')
+
         # Mark start and end points
-        plt.plot(actual_trajectory[0, 0], actual_trajectory[0, 1], 'go', markersize=8, label='Start')
-        plt.plot(actual_trajectory[-1, 0], actual_trajectory[-1, 1], 'ko', markersize=8, label='End')
-        
+        plt.scatter(actual_trajectory[0, 0], actual_trajectory[0, 1], c='g', s=60, marker='o', label='Start')
+        plt.scatter(actual_trajectory[-1, 0], actual_trajectory[-1, 1], c='k', s=60, marker='o', label='End')
+
         plt.xlabel('X Position (mm)')
         plt.ylabel('Y Position (mm)')
         plt.title('2D Trajectory Tracking')
@@ -182,6 +212,8 @@ try:
         plt.grid(True, alpha=0.3)
         plt.axis('equal')
         plt.show()
+
+
     
     print("\nMPC experiment completed successfully.")
 

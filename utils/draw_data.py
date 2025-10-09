@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import src.config as config
 
 # Load CSV
-csv_path = "/home/emanuele/Desktop/github/haptic/data/exp_2025-10-01_18-35-12/output_exp_2025-10-01_18-35-12.csv"
+csv_path = "/home/emanuele/Desktop/github/haptic/data/joined/joined.csv"
 df = pd.read_csv(csv_path)
 plot_velocity = False
 

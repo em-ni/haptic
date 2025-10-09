@@ -41,7 +41,7 @@ class Controller:
     def concentric_polygons_sweep(self, radii):
         for radius in radii:
             if debug: print(f"\nStarting sweep for radius: {radius}")
-            self.polygon_sweep(perimeter_step=50, delay=0.2, max_radius=radius)
+            self.polygon_sweep(perimeter_step=5, delay=0.2, max_radius=radius)
             time.sleep(2)
             if debug: print(f"Finished sweep for radius: {radius}")
         if debug: print("\nFinished all polygons.")
@@ -108,7 +108,6 @@ class Controller:
 
             if valid:
                 return trajectories
-
 
     def interpolate_skip_deadzone(self, start, end, N):
         """

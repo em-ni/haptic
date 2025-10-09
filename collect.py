@@ -1,3 +1,4 @@
+import numpy as np
 from src import tracker
 from src import controller
 import threading
@@ -38,9 +39,10 @@ try:
 
     # Sweep workspace in a separate thread
     # sweep_thread = threading.Thread(target=controller_instance.polygon_sweep, args=(50, 0.2, 255), daemon=False)
-    # sweep_thread = threading.Thread(target=controller_instance.concentric_polygons_sweep, args=([255, 235, 215, 175],), daemon=False)
-    # sweep_thread = threading.Thread(target=controller_instance.concentric_polygons_sweep, args=([255],), daemon=False)
-    sweep_thread = threading.Thread(target=controller_instance.run_many_random_trajectories, args=(1500, 10, 1), daemon=False)
+    radii = [160, 170, 180, 190]# 200, 205, 210, 215, 220, 225, 230, 231, 232, 234, 235, 236, 237, 238, 239, 240, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255]
+    print(f"Starting concentric polygon sweep with radii: {radii}")
+    sweep_thread = threading.Thread(target=controller_instance.concentric_polygons_sweep, args=(radii,), daemon=False)
+    # sweep_thread = threading.Thread(target=controller_instance.run_many_random_trajectories, args=(1500, 10, 1), daemon=False)
     sweep_thread.start()
     
     # Keep main thread alive and wait for threads to complete

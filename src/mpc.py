@@ -12,17 +12,17 @@ except ImportError:
 
 class MPCConfig:
     BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-    EXP_FOLDER = "exp_2025-10-01_18-35-12"
+    EXP_FOLDER = "joined"
     MODEL_PATH = os.path.join(BASE_DIR, "..", "data", EXP_FOLDER, "best_model.pth")
     SCALERS_PATH = os.path.join(BASE_DIR, "..", "data", EXP_FOLDER, "scalers.pkl")
     
     N = 3  # MPC horizon
     DT = 0.1  # time step
-    SIM_TIME = 15.0
+    SIM_TIME = 10.0
     
     # Cost weights
-    Q_pos = 1000.0  # position tracking weight
-    R_control = 0.1  # control effort weight
+    Q_pos = 100000000.0  # position tracking weight
+    R_control = 0.0  # control effort weight
     R_rate = 10.0  # control rate weight
     LAMBDA = 200.0  # terminal cost weight
     DZ_COST = 2000.0  # dead zone penalty weight

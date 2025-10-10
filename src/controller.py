@@ -23,6 +23,9 @@ class Controller:
         self.init_coordinates = [0, 0]
         self.control_window = []
 
+        # History
+        self.history_trajectories = []
+
         # Init csv to log positions and velocities if tracker is provided
         if self.tracker is not None:
             self.save_data = True
@@ -95,18 +98,26 @@ class Controller:
                     traj = np.linspace(start, end, N, dtype=int).tolist()
                 trajectories.append(traj)
             
-            # Check sign constraint at every point
+            # Check absolute values to ensure each motor does not have values over threshold for 
+            threshold = 200
             valid = True
-            # for i in range(N):
-            #     values = [trajectories[m][i] for m in range(4)]
-            #     signs = [v > 0 for v in values]
-            #     if all(signs) or not any(signs):
-            #         valid = False
-            #         # If not valid, try again
-            #         print("Generated trajectories are not valid. Retrying...")
-            #         break
+            for i in range(4):
+                # Get the i-th motor trajectory and compute average of absolute values
+                motor_traj = trajectories[i]
+                avg = np.mean(np.abs(motor_traj))
+                if avg > threshold:
+                    # Check the avg of the previous motor trajectory
+                    prev_motor_traj = self.history_trajectories[-1][i] if self.history_trajectories else [0]*N
+                    prev_avg = np.mean(np.abs(prev_motor_traj))
+                    
+                    # If also the previous motor had high values, invalidate
+                    if prev_avg > threshold:
+                        valid = False
+                        if debug: print(f"Invalid trajectory for motor {i+1}: avg {avg} with previous avg {prev_avg}")
+                        break
 
             if valid:
+                self.history_trajectories.append(trajectories)
                 return trajectories
 
     def interpolate_skip_deadzone(self, start, end, N):

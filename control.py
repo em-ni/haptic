@@ -6,6 +6,7 @@ import time
 import signal
 import sys
 import numpy as np
+from scipy.ndimage import gaussian_filter1d
 
 STEP = False
 LINE = True
@@ -70,8 +71,8 @@ try:
 
     if LINE:
         # Define target trajectory (simple line reference)
-        line_start = np.array([0.7, -0.7])
-        line_end = np.array([-0.7, 0.7])
+        line_start = np.array([1.7, -1.7])
+        line_end = np.array([-1.7, 1.7])
         target_trajectory = line_trajectory(line_start, line_end, N=100)
         print(f"Target trajectory (line): {target_trajectory} mm")
         # Initialize target_position with first point of trajectory
@@ -80,17 +81,18 @@ try:
     if CIRCLE:
         # Define target trajectory (circle reference, 2mm diameter = 1mm radius)
         circle_center = np.array([0.0, 0.0])  # Center at origin
-        circle_radius = 0.9  # mm
-        target_trajectory = circle_trajectory(circle_center, circle_radius, N=40)
+        circle_radius = 2.0  # mm
+        target_trajectory = circle_trajectory(circle_center, circle_radius, N=100)
         print(f"Target trajectory (circle): {target_trajectory} mm")
 
-        # Line from center to first point of circle
-        line_start = np.array([0.0, 0.0])
-        line_end = target_trajectory[0]
-        approach_trajectory = line_trajectory(line_start, line_end, N=10)
+        # # Line from center to first point of circle
+        # line_start = np.array([0.0, 0.0])
+        # line_end = target_trajectory[0]
+        # approach_trajectory = line_trajectory(line_start, line_end, N=10)
 
-        # Prepend approach trajectory to circle trajectory
-        target_trajectory = np.vstack((approach_trajectory, target_trajectory))
+        # # Prepend approach trajectory to circle trajectory
+        # target_trajectory = np.vstack((approach_trajectory, target_trajectory))
+
         # Initialize target_position with first point of trajectory
         target_position = target_trajectory[0]
 
@@ -134,13 +136,13 @@ try:
                 command = ",".join(str(pwm) for pwm in pwm_values)
                 
                 controller_instance.send_arduino(command)
-                time.sleep(3)
+                time.sleep(1)
                 
                 # Logging current position
                 if controller_instance.tracker is not None:
                     error = np.linalg.norm(current_pos_mm - current_target_position)
 
-                    if i % 5 == 0:  # Print every 5 steps
+                    if i % 1 == 0:  # Print every 5 steps
                         print(f"Step {i+1}/{max_iterations}: Sending PWM: {pwm_values} Current pos: [{current_pos_mm[0]:.2f}, {current_pos_mm[1]:.2f}] mm, Error: {error:.3f} mm")
                 
                 # Store data for MPC history (use consistent scaling)
@@ -190,6 +192,9 @@ try:
         # Extract x and y coordinates from history
         actual_trajectory = np.array(mpc_controller.history_y)
 
+        # Smooth actual trajectory
+        actual_trajectory = gaussian_filter1d(actual_trajectory, sigma=2, axis=0)
+
         plt.figure(figsize=(10, 6))
 
         # Plot actual trajectory points
@@ -211,7 +216,10 @@ try:
         plt.legend()
         plt.grid(True, alpha=0.3)
         plt.axis('equal')
+        plt.savefig('results/trajectory.png')
+        print("Results saved to results/trajectory.png")
         plt.show()
+
 
 
     

@@ -12,7 +12,7 @@ except ImportError:
 
 class MPCConfig:
     BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-    EXP_FOLDER = "joined"
+    EXP_FOLDER = "exp_2025-10-09_15-13-32"
     MODEL_PATH = os.path.join(BASE_DIR, "..", "data", EXP_FOLDER, "best_model.pth")
     SCALERS_PATH = os.path.join(BASE_DIR, "..", "data", EXP_FOLDER, "scalers.pkl")
     
@@ -21,7 +21,7 @@ class MPCConfig:
     SIM_TIME = 10.0
     
     # Cost weights
-    Q_pos = 100000000.0  # position tracking weight
+    Q_pos = 10000000.0  # position tracking weight
     R_control = 0.0  # control effort weight
     R_rate = 10.0  # control rate weight
     LAMBDA = 200.0  # terminal cost weight
@@ -238,7 +238,7 @@ class MPCController:
             print(f"MPC solver failed: {e}")
             return u_nom  # Return nominal control instead of zeros
     
-    def plot_results(self):
+    def plot_results(self, smooth=True):
         """Plot MPC results"""
         if len(self.history_y) == 0:
             print("No data to plot")
@@ -246,6 +246,11 @@ class MPCController:
             
         history_y = np.array(self.history_y)
         history_u = np.array(self.history_u)
+
+        if smooth:
+            from scipy.ndimage import gaussian_filter1d
+            history_y = gaussian_filter1d(history_y, sigma=2, axis=0)
+            history_u = gaussian_filter1d(history_u, sigma=2, axis=0)
         
         fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8), sharex=True)
         time_axis = np.arange(len(history_y)) * MPCConfig.DT

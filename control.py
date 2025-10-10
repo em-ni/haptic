@@ -1,3 +1,4 @@
+import math
 from src import config, tracker
 from src import controller
 from src.mpc import MPCController, MPCConfig
@@ -7,10 +8,139 @@ import signal
 import sys
 import numpy as np
 from scipy.ndimage import gaussian_filter1d
+import matplotlib.pyplot as plt
+
 
 STEP = False
-LINE = True
+LINE = False
 CIRCLE = False
+LETTER = True
+
+def letter_U(N=100):
+    """
+    Generate trajectory points forming the letter U in the XY plane.
+    """
+    # Calculate proportional distribution for N total points
+    length_left = 2.0
+    length_bottom = math.pi * 1
+    length_right = 2.0
+    total_length = length_left + length_bottom + length_right
+
+    N_left = int(N * length_left / total_length)
+    N_bottom = int(N * length_bottom / total_length)
+    N_right = N - N_left - N_bottom  # Ensure exactly N points
+
+    # Left line from -1,1 to -1,-1
+    left_line_x_values = np.linspace(-1, -1, N_left)
+    left_line_y_values = np.linspace(1, -1, N_left)
+    left_line = np.column_stack((left_line_x_values, left_line_y_values))
+
+    # Bottom semicircle from -1,-1 to 1,-1
+    theta = np.linspace(np.pi, 0, N_bottom)
+    bottom_curve_x = np.cos(theta)
+    bottom_curve_y = -1 - np.sin(theta)
+    bottom_curve = np.column_stack((bottom_curve_x, bottom_curve_y))
+
+    # Right line from 1,-1 to 1,1
+    right_line_x_values = np.linspace(1, 1, N_right)
+    right_line_y_values = np.linspace(-1, 1, N_right)
+    right_line = np.column_stack((right_line_x_values, right_line_y_values))
+    return np.vstack((left_line, bottom_curve, right_line))
+
+def letter_N(N=100):
+    """
+    Generate trajectory points forming the letter N in the XY plane.
+    """
+    # Calculate proportional distribution for N total points
+    length_left = 3.0
+    length_diag = math.sqrt((2.0)**2 + (3.0)**2)
+    length_right = 3.0
+    total_length = length_left + length_diag + length_right
+
+    N_left = int(N * length_left / total_length)
+    N_diag = int(N * length_diag / total_length)
+    N_right = N - N_left - N_diag  # Ensure exactly N points
+
+    # Left line from -1,-1.5 to -1,1.5
+    left_line_x_values = np.linspace(-1, -1, N_left)
+    left_line_y_values = np.linspace(-1.5, 1.5, N_left)
+    left_line = np.column_stack((left_line_x_values, left_line_y_values))
+
+    # Diagonal line from -1,1.5 to 1,-1.5
+    diag_x_values = np.linspace(-1, 1, N_diag)
+    diag_y_values = np.linspace(1.5, -1.5, N_diag)
+    diag_line = np.column_stack((diag_x_values, diag_y_values))
+
+    # Right line from 1,-1.5 to 1,1.5
+    right_line_x_values = np.linspace(1, 1, N_right)
+    right_line_y_values = np.linspace(-1.5, 1.5, N_right)
+    right_line = np.column_stack((right_line_x_values, right_line_y_values))
+    return np.vstack((left_line, diag_line, right_line))
+
+def letter_S(N=100):
+    """
+    Generate trajectory points forming the letter S in the XY plane.
+    """
+    # Calculate proportional distribution for N total points
+    length_top = (3/4) * 2 * math.pi * 1
+    length_bottom = (3/4) * 2 * math.pi * 1
+    total_length = length_top + length_bottom
+
+    N_top = int(N * length_top / total_length)
+    N_bottom = N - N_top  # Ensure exactly N points
+
+    # Top 3/4 circle centred at 0,1
+    theta_top = np.linspace(0, (3/4) * 2 * np.pi, N_top)
+    top_curve_x = np.cos(theta_top)
+    top_curve_y = 1 + np.sin(theta_top)
+    top_curve = np.column_stack((top_curve_x, top_curve_y))
+
+    # Bottom 3/4 circle centred at 0,-1
+    theta_bottom = np.linspace(np.pi/2, -np.pi, N_bottom)
+    bottom_curve_x = np.cos(theta_bottom)
+    bottom_curve_y = -1 + np.sin(theta_bottom)
+    bottom_curve = np.column_stack((bottom_curve_x, bottom_curve_y))
+    
+    return np.vstack((top_curve, bottom_curve))
+
+def letter_W(N=100):
+    """
+    Generate trajectory points forming the letter W in the XY plane.
+    """
+    # Calculate proportional distribution for N total points
+    length1 = math.sqrt((1)**2 + (2.0)**2)
+    length2 = math.sqrt((1)**2 + (2.0)**2)
+    length3 = math.sqrt((1)**2 + (2.0)**2)
+    length4 = math.sqrt((1)**2 + (2.0)**2)
+    total_length = length1 + length2 + length3 + length4
+
+    N1 = int(N * length1 / total_length)
+    N2 = int(N * length2 / total_length)
+    N3 = int(N * length3 / total_length)
+    N4 = N - N1 - N2 - N3  # Ensure exactly N points
+
+    # Line 1 from -2,1.0 to -1,-1
+    line1_x_values = np.linspace(-2, -1, N1)
+    line1_y_values = np.linspace(1.0, -1.0, N1)
+    line1 = np.column_stack((line1_x_values, line1_y_values))
+
+    # Line 2 from -1,-1 to 0,1.0
+    line2_x_values = np.linspace(-1, 0, N2)
+    line2_y_values = np.linspace(-1.0, 1.0, N2)
+    line2 = np.column_stack((line2_x_values, line2_y_values))
+
+    # Line 3 from 0,1.0 to 1,-1
+    line3_x_values = np.linspace(0, 1, N3)
+    line3_y_values = np.linspace(1.0, -1.0, N3)
+    line3 = np.column_stack((line3_x_values, line3_y_values))
+
+    # Line 4 from 1,-1 to 2,1.0
+    line4_x_values = np.linspace(1, 2, N4)
+    line4_y_values = np.linspace(-1.0, 1.0, N4)
+    line4 = np.column_stack((line4_x_values, line4_y_values))   
+
+    return np.vstack((line1, line2, line3, line4))
+
 
 def line_trajectory(start, end, N):
     # Return a 2D trajectory between the start and end point with N points
@@ -96,6 +226,22 @@ try:
         # Initialize target_position with first point of trajectory
         target_position = target_trajectory[0]
 
+    if LETTER:
+        letter_choice = 'W'  # U, N, S, or W
+
+        if letter_choice == 'U':
+            target_trajectory = letter_U()
+        elif letter_choice == 'N':
+            target_trajectory = letter_N()
+        elif letter_choice == 'S':
+            target_trajectory = letter_S()
+        elif letter_choice == 'W':
+            target_trajectory = letter_W()
+
+        target_position = target_trajectory[0]
+        print(f"Target trajectory (letter {letter_choice}): {target_trajectory}")
+
+
     # MPC control loop
     def mpc_control_loop(initial_target_position, target_trajectory_param=None):
         """Run MPC control loop"""
@@ -126,6 +272,9 @@ try:
                     current_target_position = target_trajectory_param[trajectory_index]
 
                 elif CIRCLE:
+                    current_target_position = target_trajectory[i % len(target_trajectory)]
+
+                elif LETTER:
                     current_target_position = target_trajectory[i % len(target_trajectory)]
 
                 # Get optimal control from MPC with current position feedback
@@ -201,11 +350,10 @@ try:
         plt.scatter(actual_trajectory[:, 0], actual_trajectory[:, 1], c='b', label='Actual Trajectory', s=30)
 
         # Plot target trajectory points
-        if LINE or CIRCLE:
-            plt.scatter(target_trajectory[:, 0], target_trajectory[:, 1], c='r', label='Target Trajectory', s=30, marker='o')
-        elif STEP:
+        if STEP:
             plt.scatter(target_position[0], target_position[1], c='r', s=80, marker='o', label='Target Position')
-
+        else:
+            plt.scatter(target_trajectory[:, 0], target_trajectory[:, 1], c='r', label='Target Trajectory', s=30, marker='o')
         # Mark start and end points
         plt.scatter(actual_trajectory[0, 0], actual_trajectory[0, 1], c='g', s=60, marker='o', label='Start')
         plt.scatter(actual_trajectory[-1, 0], actual_trajectory[-1, 1], c='k', s=60, marker='o', label='End')

@@ -35,6 +35,9 @@ class Controller:
 
     def close(self):
         if self.arduino.is_open:
+            # Send zero current to all motors
+            self.send_arduino("0,0,0,0")
+            time.sleep(0.1)
             self.arduino.close()
         else:
             print("Arduino port is already closed.")
@@ -48,6 +51,69 @@ class Controller:
             time.sleep(2)
             if debug: print(f"Finished sweep for radius: {radius}")
         if debug: print("\nFinished all polygons.")
+
+    def custom_trajectory(self, motor_ranges, motor_ids, delay=0.1):
+        """
+        Sweep motors in the input ranges in motor_ids order simultaneously.
+        motor_ids: list of motor indices (1-4)
+        motor_ranges: list of lists, where motor_ranges[i] is the range for motor_ids[i]
+        """
+        # Initialize current positions based on the first value of each range
+        current_positions = [0, 0, 0, 0]
+        
+        # Determine max length of ranges to iterate through steps
+        max_steps = 0
+        for r in motor_ranges:
+            if len(r) > max_steps:
+                max_steps = len(r)
+
+        # Update starting positions for involved motors
+        for i, m_id in enumerate(motor_ids):
+             # m_id is 1-based
+             if 0 <= m_id - 1 < 4:
+                 if len(motor_ranges[i]) > 0:
+                    current_positions[m_id - 1] = motor_ranges[i][0]
+
+        # Send initial command
+        command = ",".join(str(p) for p in current_positions)
+        if debug: print(f"Sending initial command: {command}")
+        self.send_arduino(command)
+        time.sleep(2) # Allow time to reach start
+
+        # Simultaneous Sweep
+        for t in range(max_steps):
+            
+            # Update positions for this step
+            for i, m_id in enumerate(motor_ids):
+                motor_idx = m_id - 1
+                if not (0 <= motor_idx < 4):
+                    continue
+                
+                # If this motor has a value at step t, update it
+                if t < len(motor_ranges[i]):
+                    current_positions[motor_idx] = motor_ranges[i][t]
+            
+            # Send command
+            command = ",".join(str(p) for p in current_positions)
+            if debug: print(f"Sending command: {command}")
+            self.send_arduino(command)
+            
+            if self.save_data and self.tracker is not None:
+                    # Get abs positions and velocities
+                position = self.tracker.get_position()
+                velocity = self.tracker.get_velocity()
+
+                # Convert wrt initial position and to mm
+                origin = self.init_coordinates
+                position = (position - origin) * config.px_to_mm  # convert to mm relative to initial position
+                velocity = (velocity - origin) * config.px_to_mm  # convert to mm relative to initial position
+
+                pm_values = command.split(",")
+                vm_values = [0, 0, 0, 0]  # Placeholder for velocity measurements
+                self.save_data_row(position, velocity, pm_values, vm_values)
+                if debug: print(f"Logged data: Pos {position}, Vel {velocity}, PM {pm_values}, VM {vm_values}")
+            
+            time.sleep(delay)
 
     def filter_control_signals(self, signals):
         """

@@ -12,7 +12,7 @@ except ImportError:
 
 class MPCConfig:
     BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-    EXP_FOLDER = "exp_2025-10-09_15-13-32"
+    EXP_FOLDER = "exp_2025-12-15_11-53-06"
     MODEL_PATH = os.path.join(BASE_DIR, "..", "data", EXP_FOLDER, "best_model.pth")
     SCALERS_PATH = os.path.join(BASE_DIR, "..", "data", EXP_FOLDER, "scalers.pkl")
     
@@ -24,7 +24,7 @@ class MPCConfig:
     Q_pos = 10000000.0  # position tracking weight
     R_control = 0.0  # control effort weight
     R_rate = 10.0  # control rate weight
-    LAMBDA = 200.0  # terminal cost weight
+    LAMBDA = 300.0  # terminal cost weight
     DZ_COST = 2000.0  # dead zone penalty weight
     SIGMA = 60.0  # dead zone penalty sharpness
     
@@ -254,6 +254,8 @@ class MPCController:
         
         fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8), sharex=True)
         time_axis = np.arange(len(history_y)) * MPCConfig.DT
+        
+        plt.rcParams.update({'font.size': 14})
         
         # Output plot
         ax1.plot(time_axis, history_y[:, 0], label='px')

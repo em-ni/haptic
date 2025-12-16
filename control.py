@@ -13,8 +13,8 @@ import matplotlib.pyplot as plt
 
 STEP = False
 LINE = False
-CIRCLE = False
-LETTER = True
+CIRCLE = True
+LETTER = False
 
 def letter_U(N=100):
     """
@@ -211,7 +211,7 @@ try:
     if CIRCLE:
         # Define target trajectory (circle reference, 2mm diameter = 1mm radius)
         circle_center = np.array([0.0, 0.0])  # Center at origin
-        circle_radius = 2.0  # mm
+        circle_radius = 1.8  # mm
         target_trajectory = circle_trajectory(circle_center, circle_radius, N=100)
         print(f"Target trajectory (circle): {target_trajectory} mm")
 
@@ -242,6 +242,16 @@ try:
         print(f"Target trajectory (letter {letter_choice}): {target_trajectory}")
 
 
+    # Prepend approach trajectory (hold start position)
+    if 'target_trajectory' in locals():
+        initial_hold_count = 15
+        print(f"Adding {initial_hold_count} hold points to start of trajectory")
+        initial_point = target_trajectory[0]
+        # Create array of repeated points
+        approach_trajectory = np.tile(initial_point, (initial_hold_count, 1))
+        # Prepend to existing trajectory
+        target_trajectory = np.vstack((approach_trajectory, target_trajectory))
+
     # MPC control loop
     def mpc_control_loop(initial_target_position, target_trajectory_param=None):
         """Run MPC control loop"""
@@ -253,7 +263,7 @@ try:
         dt = MPCConfig.DT
         T = MPCConfig.SIM_TIME
         control_rate = int(1.0 / dt)
-        max_iterations = int(T * control_rate)
+        max_iterations = int(T * control_rate) + initial_hold_count
 
         line_step = max_iterations // len(target_trajectory_param) if LINE and target_trajectory_param is not None else 1
         
@@ -336,6 +346,7 @@ try:
 
     # Plot 2D trajectory and target trajectory
     import matplotlib.pyplot as plt
+    plt.rcParams.update({'font.size': 14})
 
     if mpc_controller.history_y:
         # Extract x and y coordinates from history

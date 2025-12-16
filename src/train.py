@@ -349,8 +349,10 @@ def train_and_validate(model: nn.Module,
                        epochs: int = 150,
                        save_path: str = "best_model.pth",
                        use_weighted_loss: bool = False,
-                       use_density_weights: bool = False):
+                       use_density_weights: bool = False,
+                       patience: int = 10):
     best_val_loss = math.inf
+    patience_counter = 0
     history = {"train_loss": [], "val_loss": []}
 
     for epoch in range(1, epochs + 1):
@@ -413,6 +415,12 @@ def train_and_validate(model: nn.Module,
         if val_loss < best_val_loss:
             best_val_loss = val_loss
             torch.save({"model_state": model.state_dict(), "epoch": epoch, "val_loss": val_loss}, save_path)
+            patience_counter = 0
+        else:
+            patience_counter += 1
+            if patience_counter >= patience:
+                print(f"Early stopping triggered at epoch {epoch}")
+                break
 
     return history
 
@@ -450,7 +458,8 @@ def main():
     parser.add_argument("--batch-size", type=int, default=32)
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--hidden-sizes", type=int, nargs="+", default=[128, 64])
-    parser.add_argument("--dropout", type=float, default=0.05)
+    parser.add_argument("--dropout", type=float, default=0.2)
+    parser.add_argument("--patience", type=int, default=20, help="Early stopping patience.")
     parser.add_argument("--test-size", type=float, default=0.2)
     parser.add_argument("--val-size", type=float, default=0.2)
     parser.add_argument("--seed", type=int, default=42)
@@ -561,7 +570,8 @@ def main():
     history = train_and_validate(model, opt, loss_fn, train_loader, val_loader, device, 
                                 epochs=args.epochs, save_path=best_model_path, 
                                 use_weighted_loss=args.weighted_loss,
-                                use_density_weights=args.density_weights)
+                                use_density_weights=args.density_weights,
+                                patience=args.patience)
 
     # load best model
     checkpoint = torch.load(best_model_path, map_location=device)

@@ -1,4 +1,3 @@
-import numpy as np
 from src import tracker
 from src import controller
 import threading
@@ -38,12 +37,28 @@ try:
         print("No tracker provided, skipping initial position print.")
 
     # Sweep workspace in a separate thread
-    # sweep_thread = threading.Thread(target=controller_instance.polygon_sweep, args=(50, 0.2, 255), daemon=False)
-    # radii = [160, 170, 180, 190, 200, 205, 210, 215, 220, 225, 230, 231, 232, 234, 235, 236, 237, 238, 239, 240, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255]
-    # radii = [255]
-    # print(f"Starting concentric polygon sweep with radii: {radii}")
-    # sweep_thread = threading.Thread(target=controller_instance.concentric_polygons_sweep, args=(radii,), daemon=False)
-    sweep_thread = threading.Thread(target=controller_instance.run_many_random_trajectories, args=(1000, 10, 1), daemon=False)
+    traj_type = "concentric_polygons" # polygon # concentric_polygons # random # custom
+
+    if traj_type == "concentric_polygons":
+        radii = [160, 170, 180, 190, 200, 205, 210, 215, 220, 225, 230, 231, 232, 234, 235, 236, 237, 238, 239, 240, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255]
+        # radii = [200, 225, 250]
+        # radii = [255]
+        # print(f"Starting concentric polygon sweep with radii: {radii}")
+        sweep_thread = threading.Thread(target=controller_instance.concentric_polygons_sweep, args=(radii,), daemon=False)
+    elif traj_type == "polygon":
+        sweep_thread = threading.Thread(target=controller_instance.polygon_sweep, args=(50, 0.2, 255), daemon=False)
+    elif traj_type == "random":
+        sweep_thread = threading.Thread(target=controller_instance.run_many_random_trajectories, args=(1000, 10, 1), daemon=False)
+    elif traj_type == "custom":
+        total_steps = 255
+        step = 1
+        custom_motor_ranges = [
+            [-255] * total_steps,   
+            list(range(-255, 0, step)),
+            [255] * total_steps,
+            list(range(0, 255, step)),
+        ]
+        sweep_thread = threading.Thread(target=controller_instance.custom_trajectory, args=(custom_motor_ranges, [1,2,3,4], 0.2), daemon=False)
     sweep_thread.start()
     
     # Keep main thread alive and wait for threads to complete

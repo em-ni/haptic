@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from scipy.spatial import cKDTree
 
 # Expecting CSV with columns: pm1..pm4, vm1..vm4, px, py
-csv_path = "/home/emanuele/Desktop/github/haptic/data/joined/joined.csv"
+csv_path = "/home/emanuele/Desktop/github/haptic/data/exp_2025-12-15_11-53-06/output_exp_2025-12-15_11-53-06.csv"
 data = pd.read_csv(csv_path)
 
 X = data[["pm1", "pm2", "pm3", "pm4"]].values

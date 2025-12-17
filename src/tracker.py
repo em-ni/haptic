@@ -225,7 +225,7 @@ class Tracker:
         cam.release()
 
 if __name__ == "__main__":
-    cam_index = 0  # Change this based on your camera index
+    cam_index = 6  # Change this based on your camera index
     tracker = Tracker(cam_index)
     tracker.track()
     tracker.draw()

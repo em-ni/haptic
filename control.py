@@ -211,7 +211,7 @@ try:
     if CIRCLE:
         # Define target trajectory (circle reference, 2mm diameter = 1mm radius)
         circle_center = np.array([0.0, 0.0])  # Center at origin
-        circle_radius = 1.8  # mm
+        circle_radius = 2.0  # mm
         target_trajectory = circle_trajectory(circle_center, circle_radius, N=100)
         print(f"Target trajectory (circle): {target_trajectory} mm")
 
@@ -251,6 +251,12 @@ try:
         approach_trajectory = np.tile(initial_point, (initial_hold_count, 1))
         # Prepend to existing trajectory
         target_trajectory = np.vstack((approach_trajectory, target_trajectory))
+
+    # Save trajectory for replay
+    if 'target_trajectory' in locals():
+        os.makedirs('data', exist_ok=True)
+        np.save('data/saved_trajectory.npy', target_trajectory)
+        print("Trajectory saved to data/saved_trajectory.npy")
 
     # MPC control loop
     def mpc_control_loop(initial_target_position, target_trajectory_param=None):
@@ -295,7 +301,7 @@ try:
                 command = ",".join(str(pwm) for pwm in pwm_values)
                 
                 controller_instance.send_arduino(command)
-                time.sleep(1)
+                time.sleep(0.1)
                 
                 # Logging current position
                 if controller_instance.tracker is not None:

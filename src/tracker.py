@@ -3,6 +3,8 @@ import time
 import cv2
 import numpy as np
 import platform
+import argparse
+import depthai as dai
 from matplotlib.animation import FuncAnimation
 try:
     import config
@@ -41,9 +43,73 @@ class CameraStream:
         self.cap.release()
 
 
+# Threaded OAK camera stream
+class OakCameraStream:
+    def __init__(self):
+        # Initialize device first
+        self.device = dai.Device()
+        self.pipeline = dai.Pipeline(self.device)
+        
+        # Define sources and outputs
+        self.cam = self.pipeline.create(dai.node.Camera)
+        
+        # Configure Camera
+        # Try to find Cam A properties
+        found_cam_a = False
+        for sensor in self.device.getConnectedCameraFeatures():
+            if sensor.socket == dai.CameraBoardSocket.CAM_A:
+                self.cam.build(sensor.socket)
+                found_cam_a = True
+                break
+        
+        if not found_cam_a:
+             # Fallback
+             self.cam.build(dai.CameraBoardSocket.CAM_A)
+        
+        # Request output (NV12 enables getCvFrame)
+        self.cam_out = self.cam.requestOutput((1920, 1080), dai.ImgFrame.Type.NV12)
+        
+        # Create output queue
+        self.video_q = self.cam_out.createOutputQueue(maxSize=1, blocking=False)
+        
+        # Start pipeline
+        self.pipeline.start()
+        
+        self.ret = False
+        self.frame = None
+        self.running = True
+        self.lock = threading.Lock()
+        self.thread = threading.Thread(target=self.update, daemon=True)
+        self.thread.start()
+
+    def update(self):
+        while self.running:
+            in_video = self.video_q.tryGet()
+            
+            if in_video is not None:
+                frame = in_video.getCvFrame()
+                with self.lock:
+                    self.ret = True
+                    self.frame = frame
+            else:
+                time.sleep(0.001)
+
+    def read(self):
+        with self.lock:
+            return self.ret, self.frame.copy() if self.frame is not None else (False, None)
+    
+    def release(self):
+        self.running = False
+        self.thread.join()
+        # No explicit device close method in some versions, but pipeline cleanups automatically
+        # or we can try closing if method exists
+        pass
+
+
 class Tracker:
-    def __init__(self, cam_index):
+    def __init__(self, cam_index=0, use_oak=True):
         self.cam_index = cam_index
+        self.use_oak = use_oak
 
         # Smoothing factor for the exponential moving average filter (lower is smoother)
         self.alpha = 0.2
@@ -101,11 +167,14 @@ class Tracker:
         """
         Main function to track the tip position and velocity.
         """
-        cam = CameraStream(self.cam_index)
+        if self.use_oak:
+            cam = OakCameraStream()
+        else:
+            cam = CameraStream(self.cam_index)
         time.sleep(1)
 
         # Check if camera opened successfully
-        if not cam.cap.isOpened():
+        if not self.use_oak and not cam.cap.isOpened():
             print("Error: Could not open camera.")
             return
         
@@ -195,10 +264,13 @@ class Tracker:
             return line, point
 
         # Start camera stream
-        cam = CameraStream(self.cam_index)
+        if self.use_oak:
+            cam = OakCameraStream()
+        else:
+            cam = CameraStream(self.cam_index)
         time.sleep(1)
 
-        if not cam.cap.isOpened():
+        if not self.use_oak and not cam.cap.isOpened():
             print("Error: Could not open camera.")
             return
 
@@ -225,7 +297,11 @@ class Tracker:
         cam.release()
 
 if __name__ == "__main__":
-    cam_index = 6  # Change this based on your camera index
-    tracker = Tracker(cam_index)
+    parser = argparse.ArgumentParser(description="Tip Tracker")
+    parser.add_argument("--oak", action="store_true", help="Use Oak camera (Cam A)")
+    parser.add_argument("--cam", type=int, default=0, help="Webcam index")
+    args = parser.parse_args()
+
+    tracker = Tracker(cam_index=args.cam, use_oak=args.oak)
     tracker.track()
     tracker.draw()

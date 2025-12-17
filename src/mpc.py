@@ -12,11 +12,11 @@ except ImportError:
 
 class MPCConfig:
     BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-    EXP_FOLDER = "exp_2025-12-15_11-53-06"
+    EXP_FOLDER = "exp_2025-12-17_09-50-27"
     MODEL_PATH = os.path.join(BASE_DIR, "..", "data", EXP_FOLDER, "best_model.pth")
     SCALERS_PATH = os.path.join(BASE_DIR, "..", "data", EXP_FOLDER, "scalers.pkl")
     
-    N = 3  # MPC horizon
+    N = 5  # MPC horizon
     DT = 0.1  # time step
     SIM_TIME = 10.0
     
@@ -24,7 +24,7 @@ class MPCConfig:
     Q_pos = 10000000.0  # position tracking weight
     R_control = 0.0  # control effort weight
     R_rate = 10.0  # control rate weight
-    LAMBDA = 300.0  # terminal cost weight
+    LAMBDA = 200.0  # terminal cost weight
     DZ_COST = 2000.0  # dead zone penalty weight
     SIGMA = 60.0  # dead zone penalty sharpness
     
@@ -33,6 +33,9 @@ class MPCConfig:
     U_MAX = np.array([255, 255, 255, 255])
     U_DEADZONE_MIN = np.array([-150, -150, -150, -150])
     U_DEADZONE_MAX = np.array([150, 150, 150, 150])
+    
+    # Model configuration
+    USE_NONLINEAR_MODEL = True
 
 class MPCController:
     def __init__(self):
@@ -52,6 +55,7 @@ class MPCController:
         print(f"Initialized MPCController")
         print(f"  Outputs: {self.n_outputs}, Controls: {self.n_controls}")
         print(f"  Horizon N: {MPCConfig.N}, Time step: {MPCConfig.DT}")
+        print(f"  Nonlinear Model: {MPCConfig.USE_NONLINEAR_MODEL}")
         
     def _load_assets(self):
         """Load model and scalers"""
@@ -84,6 +88,61 @@ class MPCController:
         print(f"Input columns: {self.input_cols}")
         print(f"Output columns: {self.output_cols}")
     
+    def _model_prediction_casadi(self, u_in):
+        """
+        Symbolic translation of the PyTorch MLP to CasADi.
+        u_in: CasADi expression (n_controls, 1)
+        Returns: CasADi expression (n_outputs, 1)
+        """
+        # 1. Scale input
+        # x_scaled = (x - mean) / scale
+        x_mean = self.x_scaler.mean_
+        x_scale = self.x_scaler.scale_
+        
+        x = (u_in - x_mean.reshape(-1,1)) / x_scale.reshape(-1,1)
+        
+        # 2. Forward pass through network layers
+        # Access weights from self.model.network. The structure is:
+        # 0: Linear(in, 128)
+        # 1: ReLU
+        # 2: Linear(128, 256)
+        # 3: ReLU
+        # 4: Linear(256, 128)
+        # 5: ReLU
+        # 6: Linear(128, out)
+        
+        layers = [
+            (self.model.network[0], True),   # True for ReLU activation
+            (self.model.network[2], True),
+            (self.model.network[4], True),
+            (self.model.network[6], False)  # No activation on output
+        ]
+        
+        for layer, use_relu in layers:
+            W = layer.weight.detach().numpy()
+            b = layer.bias.detach().numpy()
+            
+            # Linear transform: Wx + b
+            x = ca.mtimes(W, x) + b.reshape(-1, 1)
+            
+            # Activation
+            if use_relu:
+                # Smooth ReLU (Softplus) approximation for better IPOPT convergence
+                # f(x) = log(1 + exp(x))
+                # To avoid overflow, use equivalent form for large x
+                # For basic stability: ca.log(1 + ca.exp(x))
+                x = ca.log(1 + ca.exp(x))
+                
+        # 3. Inverse scale output
+        # y = y_scaled * scale + mean
+        y_scaled = x
+        y_mean = self.y_scaler.mean_
+        y_scale = self.y_scaler.scale_
+        
+        y = y_scaled * y_scale.reshape(-1, 1) + y_mean.reshape(-1, 1)
+        
+        return y
+
     def _setup_optimization_problem(self):
         """Setup CasADi optimization problem"""
         self.opti = ca.Opti()
@@ -97,16 +156,22 @@ class MPCController:
         self.P_terminal = self.opti.parameter(self.n_outputs, self.n_outputs)  # Terminal cost matrix
         self.u_prev = self.opti.parameter(self.n_controls, 1)  # Previous control input
         
-        # Linear approximation parameters
+        # Linear approximation parameters (still used for terminal cost and possibly tracking if flag is False)
         self.A_lin = self.opti.parameter(self.n_outputs, self.n_controls)
         self.b_lin = self.opti.parameter(self.n_outputs, 1)
         
         # Cost function
         cost = 0
         for k in range(MPCConfig.N):
-            # Predict output using linear approximation
             u_k = self.U[:, k]
-            y_k = self.A_lin @ u_k + self.b_lin
+            
+            # Predict output
+            if MPCConfig.USE_NONLINEAR_MODEL:
+                # Use the full neural network symbolic graph
+                y_k = self._model_prediction_casadi(u_k)
+            else:
+                # Use linear approximation
+                y_k = self.A_lin @ u_k + self.b_lin
             
             # Tracking cost
             cost += MPCConfig.Q_pos * ca.sumsqr(y_k - self.y_ref)
@@ -127,8 +192,12 @@ class MPCController:
             cost += MPCConfig.DZ_COST * ca.exp(-(u_k[3]**2)/MPCConfig.SIGMA)
 
         
-        # Terminal cost - use final predicted output
-        y_terminal = self.A_lin @ self.U[:, -1] + self.b_lin
+        # Terminal cost
+        if MPCConfig.USE_NONLINEAR_MODEL:
+             y_terminal = self._model_prediction_casadi(self.U[:, -1])
+        else:
+             y_terminal = self.A_lin @ self.U[:, -1] + self.b_lin
+             
         y_terminal_error = y_terminal - self.y_ref
         cost += self.lambda_param * y_terminal_error.T @ self.P_terminal @ y_terminal_error
         
@@ -139,7 +208,15 @@ class MPCController:
             self.opti.subject_to(self.opti.bounded(MPCConfig.U_MIN, self.U[:, k], MPCConfig.U_MAX))
 
         # Solver settings
-        opts = {'ipopt.print_level': 0, 'print_time': 0, 'ipopt.sb': 'yes'}
+        opts = {
+            'ipopt.print_level': 0, 
+            'print_time': 0, 
+            'ipopt.sb': 'yes',
+            'ipopt.max_iter': 500,        # Increased from default
+            'ipopt.tol': 1e-3,            # Relaxed tolerance
+            'ipopt.accept_after_max_steps': 10,
+            #'ipopt.hessian_approximation': 'limited-memory' # Optional: might be faster/more robust for NNs
+        }
         self.opti.solver('ipopt', opts)
     
     def predict_output(self, u_input):
@@ -236,6 +313,15 @@ class MPCController:
             return u_optimal
         except Exception as e:
             print(f"MPC solver failed: {e}")
+            # Try to get debug value if available
+            try:
+                debug_u = self.opti.debug.value(self.U[:, 0])
+                print("Returning debug value.")
+                self.u_previous = debug_u.copy()
+                return debug_u
+            except:
+                 pass
+            
             return u_nom  # Return nominal control instead of zeros
     
     def plot_results(self, smooth=True):

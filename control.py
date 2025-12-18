@@ -1,4 +1,5 @@
 import math
+import os
 from src import config, tracker
 from src import controller
 from src.mpc import MPCController, MPCConfig
@@ -209,10 +210,10 @@ try:
         target_position = target_trajectory[0]
 
     if CIRCLE:
-        # Define target trajectory (circle reference, 2mm diameter = 1mm radius)
+        # Define target trajectory
         circle_center = np.array([0.0, 0.0])  # Center at origin
         circle_radius = 2.0  # mm
-        target_trajectory = circle_trajectory(circle_center, circle_radius, N=100)
+        target_trajectory = circle_trajectory(circle_center, circle_radius, N=1000)
         print(f"Target trajectory (circle): {target_trajectory} mm")
 
         # # Line from center to first point of circle
@@ -244,7 +245,7 @@ try:
 
     # Prepend approach trajectory (hold start position)
     if 'target_trajectory' in locals():
-        initial_hold_count = 15
+        initial_hold_count = 0
         print(f"Adding {initial_hold_count} hold points to start of trajectory")
         initial_point = target_trajectory[0]
         # Create array of repeated points
@@ -301,7 +302,7 @@ try:
                 command = ",".join(str(pwm) for pwm in pwm_values)
                 
                 controller_instance.send_arduino(command)
-                time.sleep(0.1)
+                time.sleep(1)
                 
                 # Logging current position
                 if controller_instance.tracker is not None:

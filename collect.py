@@ -41,8 +41,8 @@ try:
     # traj_type = "random"
 
     if traj_type == "concentric_polygons":
-        # radii = [160, 170, 180, 190, 200, 205, 210, 215, 220, 225, 230, 231, 232, 234, 235, 236, 237, 238, 239, 240, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255]
-        radii = [200, 225, 250]
+        radii = [160, 170, 180, 190, 200, 205, 210, 215, 220, 225, 230, 235, 240, 245, 250, 255]
+        # radii = [200, 225, 250]
         # radii = [255]
         # print(f"Starting concentric polygon sweep with radii: {radii}")
         sweep_thread = threading.Thread(target=controller_instance.concentric_polygons_sweep, args=(radii,), daemon=False)

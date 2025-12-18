@@ -107,12 +107,13 @@ class OakCameraStream:
 
 
 class Tracker:
-    def __init__(self, cam_index=0, use_oak=True):
+    def __init__(self, cam_index=0, use_oak=True, video_output='video.mp4'):
         self.cam_index = cam_index
         self.use_oak = use_oak
+        self.video_output = video_output
 
         # Smoothing factor for the exponential moving average filter (lower is smoother)
-        self.alpha = 0.2
+        self.alpha = 0.3
 
         # Tracking variables
         self.cur_pos = None
@@ -180,11 +181,21 @@ class Tracker:
         
         start_time = time.time()
         frame_count = 0
+        video_writer = None
+
         while not self.quit:
             ret, frame = cam.read()
             if not ret:
                 print("Error: Could not read frame.")
                 break
+            
+            # Save raw video if requested
+            if self.video_output is not None:
+                if video_writer is None:
+                    height, width = frame.shape[:2]
+                    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+                    video_writer = cv2.VideoWriter(self.video_output, fourcc, 30.0, (width, height))
+                video_writer.write(frame)
 
             # Detect the tip position
             pos = self.detect_tip(frame)
@@ -218,6 +229,8 @@ class Tracker:
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
 
+        if video_writer is not None:
+            video_writer.release()
         cam.release()
         cv2.destroyAllWindows()
         elapsed_time = time.time() - start_time
@@ -300,8 +313,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Tip Tracker")
     parser.add_argument("--oak", action="store_true", help="Use Oak camera (Cam A)")
     parser.add_argument("--cam", type=int, default=0, help="Webcam index")
+    parser.add_argument("--save_video", type=str, default=None, help="Path to save raw video (e.g., output.mp4)")
     args = parser.parse_args()
 
-    tracker = Tracker(cam_index=args.cam, use_oak=args.oak)
+    tracker = Tracker(cam_index=args.cam, use_oak=args.oak, video_output=args.save_video)
     tracker.track()
     tracker.draw()

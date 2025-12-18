@@ -12,16 +12,16 @@ except ImportError:
 
 class MPCConfig:
     BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-    EXP_FOLDER = "exp_2025-12-17_09-50-27"
+    EXP_FOLDER = "joined"
     MODEL_PATH = os.path.join(BASE_DIR, "..", "data", EXP_FOLDER, "best_model.pth")
     SCALERS_PATH = os.path.join(BASE_DIR, "..", "data", EXP_FOLDER, "scalers.pkl")
     
-    N = 5  # MPC horizon
-    DT = 0.1  # time step
+    N = 3  # MPC horizon
+    DT = 0.001  # time step
     SIM_TIME = 10.0
     
     # Cost weights
-    Q_pos = 10000000.0  # position tracking weight
+    Q_pos = 100000000.0  # position tracking weight
     R_control = 0.0  # control effort weight
     R_rate = 10.0  # control rate weight
     LAMBDA = 200.0  # terminal cost weight
@@ -35,7 +35,7 @@ class MPCConfig:
     U_DEADZONE_MAX = np.array([150, 150, 150, 150])
     
     # Model configuration
-    USE_NONLINEAR_MODEL = True
+    USE_NONLINEAR_MODEL = False
 
 class MPCController:
     def __init__(self):
@@ -212,10 +212,10 @@ class MPCController:
             'ipopt.print_level': 0, 
             'print_time': 0, 
             'ipopt.sb': 'yes',
-            'ipopt.max_iter': 500,        # Increased from default
-            'ipopt.tol': 1e-3,            # Relaxed tolerance
-            'ipopt.accept_after_max_steps': 10,
-            #'ipopt.hessian_approximation': 'limited-memory' # Optional: might be faster/more robust for NNs
+            # 'ipopt.max_iter': 1000,        
+            # 'ipopt.tol': 1e-4,           
+            # 'ipopt.accept_after_max_steps': 10000,
+            # 'ipopt.hessian_approximation': 'limited-memory'
         }
         self.opti.solver('ipopt', opts)
     
